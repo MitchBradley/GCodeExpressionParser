@@ -168,10 +168,10 @@ void parser::eval_exp6(double& result) {
         strcpy(temp_token, token);
         get_token();
     }
-    if ((*token == '(')) {
+    if ((*token == '[')) {
         get_token();
         eval_exp2(result);
-        if (*token != ')')
+        if (*token != ']')
             strcpy(errormsg, "Unbalanced Parentheses");
         if (isfunc) {
             if (!strcmp(temp_token, "SIN"))
@@ -240,17 +240,23 @@ void parser::get_token() {
         return;
     while (isspace(*exp_ptr))  // skip over white space
         ++exp_ptr;
-    if (strchr("+-*/%^=()", *exp_ptr)) {
+    if (strchr("+-*/%=[]", *exp_ptr)) {
         tok_type = DELIMITER;
-        *temp++  = *exp_ptr++;  // advance to next char
+        // Translate "**" to "^"
+        if (*exp_ptr == '*' && exp_ptr[1] == '*') {
+            *temp++ = '^';
+            exp_ptr += 2;
+        } else {
+            *temp++ = *exp_ptr++;  // advance to next char
+        }
     } else if (isalpha(*exp_ptr)) {
-        while (!strchr(" +-/*%^=()\t\r", *exp_ptr) && (*exp_ptr))
+        while (!strchr(" +-/*%=[]\t\r", *exp_ptr) && (*exp_ptr))
             *temp++ = toupper(*exp_ptr++);
         while (isspace(*exp_ptr))  // skip over white space
             ++exp_ptr;
-        tok_type = (*exp_ptr == '(') ? FUNCTION : VARIABLE;
+        tok_type = (*exp_ptr == '[') ? FUNCTION : VARIABLE;
     } else if (isdigit(*exp_ptr) || *exp_ptr == '.') {
-        while (!strchr(" +-/*%^=()\t\r", *exp_ptr) && (*exp_ptr))
+        while (!strchr(" +-/*%=[]\t\r", *exp_ptr) && (*exp_ptr))
             *temp++ = toupper(*exp_ptr++);
         tok_type = NUMBER;
     }
