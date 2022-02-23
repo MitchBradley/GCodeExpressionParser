@@ -29,6 +29,7 @@ Last modified: Aug. 2016.
 #include <cstdlib>
 #include <cctype>
 #include <cstring>
+#include <map>
 #include <math.h>
 
 #define PI 3.14159265358979323846
@@ -36,19 +37,21 @@ Last modified: Aug. 2016.
 using namespace std;
 
 enum types { DELIMITER = 1, VARIABLE, NUMBER, FUNCTION };
-const int NUMVARS = 26;
 class parser {
-    char*  exp_ptr;        // points to the expression
-    char   token[256];     // holds current token
-    char   tok_type;       // holds token's type
-    double vars[NUMVARS];  // holds variable's values
-    void   eval_exp1(double& result);
-    void   eval_exp2(double& result);
-    void   eval_exp3(double& result);
-    void   eval_exp4(double& result);
-    void   eval_exp5(double& result);
-    void   eval_exp6(double& result);
-    void   get_token();
+    char* exp_ptr;     // points to the expression
+    char  token[256];  // holds current token
+    char  tok_type;    // holds token's type
+    void  eval_exp1(double& result);
+    void  eval_exp2(double& result);
+    void  eval_exp3(double& result);
+    void  eval_exp4(double& result);
+    void  eval_exp5(double& result);
+    void  eval_exp6(double& result);
+    void  get_token();
+
+    //    std::map<std::string, float> vars;
+
+    void print_vars();
 
 public:
     parser();
@@ -59,10 +62,16 @@ public:
 parser::parser() {
     int i;
     exp_ptr = NULL;
-    for (i = 0; i < NUMVARS; i++)
-        vars[i] = 0.0;
+    //    vars.clear();
     errormsg[0] = '\0';
 }
+#if 0
+void parser::print_vars() {
+    for (const auto& n : vars) {
+        cout << n.first << " = " << n.second << endl;
+    }
+}
+#endif
 // Parser entry point.
 double parser::eval_exp(char* exp) {
     errormsg[0] = '\0';
@@ -70,7 +79,7 @@ double parser::eval_exp(char* exp) {
     exp_ptr = exp;
     get_token();
     if (!*token) {
-        strcpy(errormsg, "No Expression Present");  // no expression present
+        strcpy(errormsg, "End");  // no expression present
         return (double)0;
     }
     eval_exp1(result);
@@ -87,7 +96,7 @@ void parser::eval_exp1(double& result) {
         char* t_ptr = exp_ptr;
         strcpy(temp_token, token);
         // compute the index of the variable
-        slot = *token - 'A';
+
         get_token();
         if (*token != '=') {
             exp_ptr = t_ptr;            // return current token
@@ -96,7 +105,8 @@ void parser::eval_exp1(double& result) {
         } else {
             get_token();  // get next part of exp
             eval_exp2(result);
-            vars[slot] = result;
+            //            vars[std::string(temp_token)] = result;
+            // print_vars();
             return;
         }
     }
@@ -104,8 +114,8 @@ void parser::eval_exp1(double& result) {
 }
 // Add or subtract two terms.
 void parser::eval_exp2(double& result) {
-    register char op;
-    double        temp;
+    char   op;
+    double temp;
     eval_exp3(result);
     while ((op = *token) == '+' || op == '-') {
         get_token();
@@ -122,8 +132,8 @@ void parser::eval_exp2(double& result) {
 }
 // Multiply or divide two factors.
 void parser::eval_exp3(double& result) {
-    register char op;
-    double        temp;
+    char   op;
+    double temp;
     eval_exp4(result);
     while ((op = *token) == '*' || op == '/') {
         get_token();
@@ -150,7 +160,7 @@ void parser::eval_exp4(double& result) {
 }
 // Evaluate a unary + or -.
 void parser::eval_exp5(double& result) {
-    register char op;
+    char op;
     op = 0;
     if ((tok_type == DELIMITER) && *token == '+' || *token == '-') {
         op = *token;
@@ -184,9 +194,10 @@ void parser::eval_exp6(double& result) {
                 result = 180 / PI * asin(result);
             else if (!strcmp(temp_token, "ACOS"))
                 result = 180 / PI * acos(result);
-            else if (!strcmp(temp_token, "ATAN"))
+            else if (!strcmp(temp_token, "ATAN"))  // LinuxCNC has ATAN[arg]/[arg]
                 result = 180 / PI * atan(result);
-            else if (!strcmp(temp_token, "SINH"))
+#if 0
+            else if (!strcmp(temp_token, "SINH")) // Not in LinuxCNC
                 result = sinh(result);
             else if (!strcmp(temp_token, "COSH"))
                 result = cosh(result);
@@ -198,28 +209,31 @@ void parser::eval_exp6(double& result) {
                 result = acosh(result);
             else if (!strcmp(temp_token, "ATANH"))
                 result = atanh(result);
-            else if (!strcmp(temp_token, "LN"))
-                result = log(result);
             else if (!strcmp(temp_token, "LOG"))
                 result = log10(result);
+            else if (!strcmp(temp_token, "SQR"))
+                result = result * result;
+#endif
+            else if (!strcmp(temp_token, "LN"))
+                result = log(result);
             else if (!strcmp(temp_token, "EXP"))
                 result = exp(result);
             else if (!strcmp(temp_token, "SQRT"))
                 result = sqrt(result);
-            else if (!strcmp(temp_token, "SQR"))
-                result = result * result;
             else if (!strcmp(temp_token, "ROUND"))
                 result = round(result);
-            else if (!strcmp(temp_token, "INT"))
+            else if (!strcmp(temp_token, "FIX"))
                 result = floor(result);
+            else if (!strcmp(temp_token, "FUP"))
+                result = ceil(result);
             else
                 strcpy(errormsg, "Unknown Function");
         }
         get_token();
-    } else
+    } else {
         switch (tok_type) {
             case VARIABLE:
-                result = vars[*token - 'A'];
+                result = vars[std::string(token)];
                 get_token();
                 return;
             case NUMBER:
@@ -229,10 +243,11 @@ void parser::eval_exp6(double& result) {
             default:
                 strcpy(errormsg, "Syntax Error");
         }
+    }
 }
 // Obtain the next token.
 void parser::get_token() {
-    register char* temp;
+    char* temp;
     tok_type = 0;
     temp     = token;
     *temp    = '\0';
@@ -249,6 +264,37 @@ void parser::get_token() {
         } else {
             *temp++ = *exp_ptr++;  // advance to next char
         }
+    } else if (*exp_ptr == '#') {  // GCode variable
+        tok_type = VARIABLE;
+        ++exp_ptr;
+        if (*exp_ptr == '<') {  // named variable
+            ++exp_ptr;
+            while (*exp_ptr != '>') {
+                if (!*exp_ptr) {
+                    // tok_type = SYNTAX_ERROR
+                    return;
+                }
+                if (isspace(*exp_ptr)) {
+                    ++exp_ptr;
+                    continue;
+                }
+                if (isalpha(*exp_ptr)) {
+                    *temp++ = tolower(*exp_ptr++);
+                    continue;
+                }
+                if (isdigit(*exp_ptr) || *exp_ptr == '_') {
+                    *temp++ = *exp_ptr++;
+                    continue;
+                }
+                // tok_type = SYNTAX_ERROR
+                return;
+            }
+            ++exp_ptr;
+        } else {  // numbered variable
+            while (isdigit(*exp_ptr)) {
+                *temp++ = *exp_ptr++;
+            }
+        }
     } else if (isalpha(*exp_ptr)) {
         while (!strchr(" +-/*%=[]\t\r", *exp_ptr) && (*exp_ptr))
             *temp++ = toupper(*exp_ptr++);
@@ -261,8 +307,8 @@ void parser::get_token() {
         tok_type = NUMBER;
     }
     *temp = '\0';
-    if ((tok_type == VARIABLE) && (token[1]))
-        strcpy(errormsg, "Only first letter of variables is considered");
+    //    if ((tok_type == VARIABLE) && (token[1]))
+    //        strcpy(errormsg, "Only first letter of variables is considered");
 }
 
 int main() {
